@@ -1,2 +1,2 @@
 name: project_base
-desc: AESD Buildroot External Tree
+description: Base customization for project
