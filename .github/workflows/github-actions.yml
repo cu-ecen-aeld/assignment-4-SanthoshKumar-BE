@@ -1,5 +1,4 @@
 name: assignment-test
-
 on:
   push:
     tags-ignore:
@@ -9,29 +8,28 @@ on:
 
 jobs:
   full-test:
-    container: cuaesd/aesd-autotest:24-assignment4-buildroot
     runs-on: self-hosted
+    container: cuaesd/aesd-autotest:24-assignment4-buildroot
     timeout-minutes: 120
-
     steps:
-      # Checkout main repo + submodules
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # Workaround for old git inside the container
+      - name: Force older git protocol
+        run: git config --global protocol.version 0
 
-      # Setup SSH agent (needed if submodules are private via SSH)
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: actions/checkout@v4
+
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+
+      - uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # Run your test script
       - name: Run full test
         env:
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
         run: ./full-test.sh
 
-      # Cleanup SSH keys
       - name: Cleanup
         if: always()
         run: ssh-add -D
