@@ -14,32 +14,23 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      # ✅ Step 1: Checkout your repo
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-      # ✅ Step 2: Set up SSH before submodules
-      - name: Set up SSH for GitHub access
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+
+      - name: Start SSH Agent
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # ✅ Step 3: Add GitHub to known hosts (prevents SSH verification failure)
-      - name: Add GitHub to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-      # ✅ Step 4: Now safely checkout submodules
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
-
-      # ✅ Step 5: Run your full test script
       - name: Run full test
         env:
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+          FORCE_UNSAFE_CONFIGURE: 1
         run: ./full-test.sh
 
-      # ✅ Step 6: Cleanup SSH keys after job (good practice)
-      - name: Cleanup
+      - name: Cleanup SSH Agent
         if: always()
         run: ssh-add -D
