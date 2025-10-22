@@ -1,65 +1,125 @@
-name: full-test
+name: Full Assignment Build & Test
 
+# Trigger on push to main/master, PRs, or manual run
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
+concurrency:
+  group: full-test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  full-test:
-    name: Run full test
-    runs-on: ubuntu-22.04  # ✅ Default GitHub runner, no self-hosting
+  build-and-test:
+    name: Build & Run Full Test (GitHub-hosted)
+    runs-on: ubuntu-22.04
+    # increase timeout if you expect long builds (minutes)
+    timeout-minutes: 360
 
     steps:
-      # --- Step 1: Checkout Repository ---
-      - name: Checkout repository
+      - name: Checkout repository (no submodules yet)
         uses: actions/checkout@v4
         with:
-          submodules: true  # Pulls assignment-autotest, etc.
+          # don't automatically try to pull submodules with https; we'll init after ssh is available
+          submodules: false
+          persist-credentials: false
 
-      # --- Step 2: Setup SSH for private submodules (optional but safe) ---
-      - name: Setup SSH
+      # Optional: setup SSH to allow private submodule clones (only if needed)
+      - name: Start ssh-agent and add key (if you need SSH for submodules)
+        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # --- Step 3: Install Dependencies ---
-      - name: Install dependencies
+      - name: Initialize submodules (if you use them)
+        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
+        run: |
+          git submodule sync --recursive || true
+          git submodule update --init --recursive --force
+
+      # If you DO NOT use submodules or they are public, you can use:
+      - name: Initialize submodules (public)
+        if: ${{ secrets.SSH_PRIVATE_KEY == '' }}
+        run: |
+          git submodule update --init --recursive || true
+
+      - name: Install required packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential qemu-user qemu-system-arm qemu-system-x86 \
-            gcc g++ git make curl netcat python3 python3-pip pkg-config libtool autoconf automake
+          # keep this list minimal; add packages needed for your build/test
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git make curl ca-certificates \
+            qemu-user qemu-system-arm qemu-system-x86 \
+            pkg-config libncurses5-dev libncursesw5-dev \
+            python3 python3-pip netcat-openbsd \
+            bc bison flex autoconf automake libtool \
+            gcc g++ ccache
+          # ensure wget/curl present
+          which wget || sudo apt-get install -y wget
 
-      # --- Step 4: Cache Buildroot output (optional but speeds up builds) ---
+      # Cache the buildroot output directory to speed repeated runs.
+      # Note: Using a simple key avoids template/hashFiles failures from very large trees.
       - name: Cache Buildroot output
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: buildroot/output
-          key: ${{ runner.os }}-buildroot-${{ hashFiles('buildroot/**') }}
+          path: |
+            buildroot/output
+            ~/.cache/buildroot
+          key: ${{ runner.os }}-buildroot-${{ github.ref }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-buildroot-
 
-      # --- Step 5: Limit parallel build jobs to prevent OOM ---
-      - name: Configure low-memory build
+      # Limit parallelism to avoid memory OOM on GitHub runner
+      # This sets MAKEFLAGS for invoked make and a Buildroot job-level fallback
+      - name: Configure low-memory/low-jobs build
         run: |
-          echo "BR2_JLEVEL=2" >> .config || true
+          echo "Setting environment to limit parallelism to avoid OOM"
+          echo "export MAKEFLAGS='-j2'" >> $GITHUB_ENV
+          # buildroot job-level parallelism (some scripts respect BR2_JLEVEL)
+          echo "BR2_JLEVEL=1" >> ./.br2_build_env || true
+          echo "MAKEFLAGS and BR2_JLEVEL set"
 
-      # --- Step 6: Run Full Test ---
-      - name: Run full test
+      - name: Show a little context (debug)
         run: |
-          echo "Starting full test..."
-          chmod +x ./full-test.sh || true
-          ./full-test.sh
+          echo "Runner OS: $RUNNER_OS"
+          uname -a
+          df -h
+          free -m
+          ls -la
+
+      - name: Run full-test script
         env:
           SKIP_BUILD: ""
           DO_VALIDATE: "1"
+          # ensure ssh host key check off when cloning from inside test scripts (if needed)
+          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        run: |
+          set -euo pipefail
+          chmod +x ./full-test.sh || true
+          echo "Starting full-test.sh..."
+          time ./full-test.sh
 
-      # --- Step 7: Cleanup ---
-      - name: Cleanup
+      - name: Collect logs/artifacts on failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          echo "Collecting logs for debugging..."
+          # gather build logs if present
+          find . -maxdepth 3 -type f -name '*.log' -print || true
+          # upload some small artifacts could be added here (but beware size limits)
+
+      - name: Cleanup build outputs (always)
         if: always()
         run: |
-          echo "Cleaning up build outputs..."
+          echo "Cleaning large build outputs to avoid runner disk pressure"
           rm -rf buildroot/output/target || true
           rm -rf buildroot/output/build || true
+          rm -rf buildroot/output/host || true
+          df -h || true
