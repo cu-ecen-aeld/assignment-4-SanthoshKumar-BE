@@ -1,47 +1,28 @@
+
 name: assignment-test
-
 on:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '*'
-
+    push:
+        tags-ignore:
+            - '*'
+        branches:
+            - '*'
 jobs:
-  full-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-
-    container:
-      image: cuaesd/aesd-autotest:24-assignment4-buildroot
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Cache Buildroot output
-        uses: actions/cache@v4
-        with:
-          path: buildroot/output
-          key: buildroot-${{ hashFiles('buildroot/**') }}
-          restore-keys: |
-            buildroot-
-
-      # ✅ Conditional SSH setup only if SSH_PRIVATE_KEY secret exists
-      - name: Setup SSH
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
-        uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Run full test
-        env:
-          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-        run: ./full-test.sh
-
-      - name: Cleanup
-        if: always()
-        run: |
-          ssh-add -D || true
+    full-test:
+        container: cuaesd/aesd-autotest:24-assignment4-buildroot
+        runs-on: self-hosted
+        timeout-minutes: 120
+        steps:
+          - uses: actions/checkout@v2
+          - name: Checkout submodules
+            run: git submodule update --init --recursive
+          - uses: webfactory/ssh-agent@v0.5.3
+            with:
+                ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          - name: Run full test
+            env:
+              GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+            run: ./full-test.sh
+          - name: Cleanup
+            if: always()
+            run: |
+              ssh-add -D
