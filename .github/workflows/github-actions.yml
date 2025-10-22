@@ -1,28 +1,65 @@
+name: full-test
 
-name: assignment-test
 on:
-    push:
-        tags-ignore:
-            - '*'
-        branches:
-            - '*'
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
 jobs:
-    full-test:
-        container: cuaesd/aesd-autotest:24-assignment4-buildroot
-        runs-on: self-hosted
-        timeout-minutes: 120
-        steps:
-          - uses: actions/checkout@v2
-          - name: Checkout submodules
-            run: git submodule update --init --recursive
-          - uses: webfactory/ssh-agent@v0.5.3
-            with:
-                ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          - name: Run full test
-            env:
-              GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-            run: ./full-test.sh
-          - name: Cleanup
-            if: always()
-            run: |
-              ssh-add -D
+  full-test:
+    name: Run full test
+    runs-on: ubuntu-22.04  # ✅ Default GitHub runner, no self-hosting
+
+    steps:
+      # --- Step 1: Checkout Repository ---
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true  # Pulls assignment-autotest, etc.
+
+      # --- Step 2: Setup SSH for private submodules (optional but safe) ---
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # --- Step 3: Install Dependencies ---
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential qemu-user qemu-system-arm qemu-system-x86 \
+            gcc g++ git make curl netcat python3 python3-pip pkg-config libtool autoconf automake
+
+      # --- Step 4: Cache Buildroot output (optional but speeds up builds) ---
+      - name: Cache Buildroot output
+        uses: actions/cache@v3
+        with:
+          path: buildroot/output
+          key: ${{ runner.os }}-buildroot-${{ hashFiles('buildroot/**') }}
+          restore-keys: |
+            ${{ runner.os }}-buildroot-
+
+      # --- Step 5: Limit parallel build jobs to prevent OOM ---
+      - name: Configure low-memory build
+        run: |
+          echo "BR2_JLEVEL=2" >> .config || true
+
+      # --- Step 6: Run Full Test ---
+      - name: Run full test
+        run: |
+          echo "Starting full test..."
+          chmod +x ./full-test.sh || true
+          ./full-test.sh
+        env:
+          SKIP_BUILD: ""
+          DO_VALIDATE: "1"
+
+      # --- Step 7: Cleanup ---
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up build outputs..."
+          rm -rf buildroot/output/target || true
+          rm -rf buildroot/output/build || true
