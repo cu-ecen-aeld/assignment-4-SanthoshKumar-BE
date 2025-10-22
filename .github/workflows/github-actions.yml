@@ -1,125 +1,47 @@
-name: Full Assignment Build & Test
+name: assignment-test
 
-# Trigger on push to main/master, PRs, or manual run
 on:
   push:
     branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
-
-concurrency:
-  group: full-test-${{ github.ref }}
-  cancel-in-progress: true
+      - '*'
+    tags-ignore:
+      - '*'
 
 jobs:
-  build-and-test:
-    name: Build & Run Full Test (GitHub-hosted)
-    runs-on: ubuntu-22.04
-    # increase timeout if you expect long builds (minutes)
-    timeout-minutes: 360
+  full-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    container:
+      image: cuaesd/aesd-autotest:24-assignment4-buildroot
 
     steps:
-      - name: Checkout repository (no submodules yet)
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # don't automatically try to pull submodules with https; we'll init after ssh is available
-          submodules: false
-          persist-credentials: false
+          submodules: recursive
 
-      # Optional: setup SSH to allow private submodule clones (only if needed)
-      - name: Start ssh-agent and add key (if you need SSH for submodules)
+      - name: Cache Buildroot output
+        uses: actions/cache@v4
+        with:
+          path: buildroot/output
+          key: buildroot-${{ hashFiles('buildroot/**') }}
+          restore-keys: |
+            buildroot-
+
+      # ✅ Conditional SSH setup only if SSH_PRIVATE_KEY secret exists
+      - name: Setup SSH
         if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Initialize submodules (if you use them)
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
-        run: |
-          git submodule sync --recursive || true
-          git submodule update --init --recursive --force
-
-      # If you DO NOT use submodules or they are public, you can use:
-      - name: Initialize submodules (public)
-        if: ${{ secrets.SSH_PRIVATE_KEY == '' }}
-        run: |
-          git submodule update --init --recursive || true
-
-      - name: Install required packages
-        run: |
-          sudo apt-get update
-          # keep this list minimal; add packages needed for your build/test
-          sudo apt-get install -y --no-install-recommends \
-            build-essential git make curl ca-certificates \
-            qemu-user qemu-system-arm qemu-system-x86 \
-            pkg-config libncurses5-dev libncursesw5-dev \
-            python3 python3-pip netcat-openbsd \
-            bc bison flex autoconf automake libtool \
-            gcc g++ ccache
-          # ensure wget/curl present
-          which wget || sudo apt-get install -y wget
-
-      # Cache the buildroot output directory to speed repeated runs.
-      # Note: Using a simple key avoids template/hashFiles failures from very large trees.
-      - name: Cache Buildroot output
-        uses: actions/cache@v4
-        with:
-          path: |
-            buildroot/output
-            ~/.cache/buildroot
-          key: ${{ runner.os }}-buildroot-${{ github.ref }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-buildroot-
-
-      # Limit parallelism to avoid memory OOM on GitHub runner
-      # This sets MAKEFLAGS for invoked make and a Buildroot job-level fallback
-      - name: Configure low-memory/low-jobs build
-        run: |
-          echo "Setting environment to limit parallelism to avoid OOM"
-          echo "export MAKEFLAGS='-j2'" >> $GITHUB_ENV
-          # buildroot job-level parallelism (some scripts respect BR2_JLEVEL)
-          echo "BR2_JLEVEL=1" >> ./.br2_build_env || true
-          echo "MAKEFLAGS and BR2_JLEVEL set"
-
-      - name: Show a little context (debug)
-        run: |
-          echo "Runner OS: $RUNNER_OS"
-          uname -a
-          df -h
-          free -m
-          ls -la
-
-      - name: Run full-test script
+      - name: Run full test
         env:
-          SKIP_BUILD: ""
-          DO_VALIDATE: "1"
-          # ensure ssh host key check off when cloning from inside test scripts (if needed)
-          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-        run: |
-          set -euo pipefail
-          chmod +x ./full-test.sh || true
-          echo "Starting full-test.sh..."
-          time ./full-test.sh
+          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+        run: ./full-test.sh
 
-      - name: Collect logs/artifacts on failure
-        if: failure()
-        continue-on-error: true
-        run: |
-          echo "Collecting logs for debugging..."
-          # gather build logs if present
-          find . -maxdepth 3 -type f -name '*.log' -print || true
-          # upload some small artifacts could be added here (but beware size limits)
-
-      - name: Cleanup build outputs (always)
+      - name: Cleanup
         if: always()
         run: |
-          echo "Cleaning large build outputs to avoid runner disk pressure"
-          rm -rf buildroot/output/target || true
-          rm -rf buildroot/output/build || true
-          rm -rf buildroot/output/host || true
-          df -h || true
+          ssh-add -D || true
