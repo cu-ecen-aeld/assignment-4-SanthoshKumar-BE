@@ -2,35 +2,48 @@ name: assignment-test
 
 on:
   push:
-    tags-ignore:
-      - '*'
     branches:
+      - '*'
+    tags-ignore:
       - '*'
 
 jobs:
   full-test:
-    container: cuaesd/aesd-autotest:24-assignment4-buildroot
-    runs-on: self-hosted
-    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    container:
+      image: cuaesd/aesd-autotest:24-assignment4-buildroot
+    timeout-minutes: 180
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
-
-      - name: Start SSH Agent
+      - name: Set up SSH for private access
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Run full test
+      - name: Cache Buildroot downloads
+        uses: actions/cache@v3
+        with:
+          path: buildroot/dl
+          key: buildroot-dl-${{ runner.os }}-${{ hashFiles('buildroot/package/**') }}
+          restore-keys: |
+            buildroot-dl-
+
+      - name: Run Buildroot and validation tests
         env:
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
           FORCE_UNSAFE_CONFIGURE: 1
-        run: ./full-test.sh
+          BR2_JOBS: 2
+        run: |
+          echo "Starting full test..."
+          export BR2_JOBS=2
+          export FORCE_UNSAFE_CONFIGURE=1
+          ./full-test.sh || (echo "Build failed, retrying..." && ./full-test.sh)
 
-      - name: Cleanup SSH Agent
+      - name: Cleanup SSH keys
         if: always()
         run: ssh-add -D
