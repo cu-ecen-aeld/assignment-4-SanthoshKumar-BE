@@ -1,28 +1,42 @@
-
 name: assignment-test
 on:
-    push:
-        tags-ignore:
-            - '*'
-        branches:
-            - '*'
+  push:
+    tags-ignore:
+      - '*'
+    branches:
+      - '*'
 jobs:
-    full-test:
-        container: cuaesd/aesd-autotest:24-assignment4-buildroot
-        runs-on: self-hosted
-        timeout-minutes: 120
-        steps:
-          - uses: actions/checkout@v2
-          - name: Checkout submodules
-            run: git submodule update --init --recursive
-          - uses: webfactory/ssh-agent@v0.5.3
-            with:
-                ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          - name: Run full test
-            env:
-              GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-            run: ./full-test.sh
-          - name: Cleanup
-            if: always()
-            run: |
-              ssh-add -D
+  full-test:
+    container: cuaesd/aesd-autotest:24-assignment4-buildroot
+    runs-on: self-hosted
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+
+      - uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # 🟢 Add swap memory setup here
+      - name: Allocate 8GB Swap
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Run full test
+        env:
+          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+        run: |
+          export MAKEFLAGS="-j2"
+          export BR2_JLEVEL=2
+          ./full-test.sh
+
+      - name: Cleanup
+        if: always()
+        run: ssh-add -D
