@@ -9,7 +9,7 @@ on:
 
 jobs:
   full-test:
-    runs-on: ubuntu-latest    # ✅ Use GitHub-hosted runner
+    runs-on: ubuntu-latest     # ✅ GitHub-hosted runner
     container: cuaesd/aesd-autotest:24-assignment4-buildroot
     timeout-minutes: 120
 
@@ -29,6 +29,7 @@ jobs:
       - name: Run full test
         env:
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+          FORCE_UNSAFE_CONFIGURE: 1       # ✅ Fix for tar configure issue
         run: ./full-test.sh
 
       - name: Cleanup
