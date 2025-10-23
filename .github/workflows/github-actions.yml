@@ -1,42 +1,38 @@
 name: assignment-test
+
 on:
   push:
-    tags-ignore:
-      - '*'
     branches:
       - '*'
+    tags-ignore:
+      - '*'
+
 jobs:
   full-test:
+    runs-on: ubuntu-latest    # ✅ Use GitHub-hosted runner
     container: cuaesd/aesd-autotest:24-assignment4-buildroot
-    runs-on: self-hosted
     timeout-minutes: 120
+
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Checkout submodules
         run: git submodule update --init --recursive
 
-      - uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      # 🟢 Add swap memory setup here
-      - name: Allocate 8GB Swap
+      - name: Configure low-memory build
         run: |
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          free -h
+          echo "Applying low-memory build configuration"
+          export MAKEFLAGS="-j2"
+          export BR2_JLEVEL=2
 
       - name: Run full test
         env:
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-        run: |
-          export MAKEFLAGS="-j2"
-          export BR2_JLEVEL=2
-          ./full-test.sh
+        run: ./full-test.sh
 
       - name: Cleanup
         if: always()
-        run: ssh-add -D
+        run: |
+          echo "Cleaning up temporary files"
+          rm -rf buildroot/output || true
