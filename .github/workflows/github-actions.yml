@@ -9,31 +9,43 @@ on:
 
 jobs:
   full-test:
-    runs-on: ubuntu-latest     # ✅ GitHub-hosted runner
+    runs-on: ubuntu-latest
     container: cuaesd/aesd-autotest:24-assignment4-buildroot
     timeout-minutes: 120
 
     steps:
+      # Step 1: Checkout your repository (including submodules)
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
-
-      - name: Configure low-memory build
+      # Step 2: Setup Git credentials for Buildroot to fetch dependencies
+      - name: Set up Git credentials
         run: |
-          echo "Applying low-memory build configuration"
-          export MAKEFLAGS="-j2"
-          export BR2_JLEVEL=2
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "git@github.com:"
 
+      # Step 3: Allocate swap memory (to prevent out-of-memory errors)
+      - name: Add swap space
+        run: |
+          fallocate -l 8G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=8192
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          free -h
+
+      # Step 4: Run your build/test
       - name: Run full test
         env:
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-          FORCE_UNSAFE_CONFIGURE: 1       # ✅ Fix for tar configure issue
-        run: ./full-test.sh
+          FORCE_UNSAFE_CONFIGURE: 1   # fixes tar configure root error
+        run: |
+          ./full-test.sh
 
+      # Step 5: Always cleanup
       - name: Cleanup
         if: always()
         run: |
-          echo "Cleaning up temporary files"
-          rm -rf buildroot/output || true
+          swapoff /swapfile || true
+          rm -f /swapfile
