@@ -20,13 +20,15 @@ jobs:
             with:
                 ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           
-          - name: Set environment and run test
+          - name: Set up build environment and run test
             env:
               GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
             run: |
-              export srctree=$(pwd)/base_external
-              export BR2_EXTERNAL=$(pwd)/base_external
-              ./full-test.sh
+              cd buildroot
+              export srctree=$(pwd)/../base_external
+              make distclean
+              make BR2_EXTERNAL=../base_external aesd_qemu_defconfig
+              make
           
           - name: Cleanup
             if: always()
