@@ -1,35 +1,38 @@
 name: assignment-test
+
 on:
-    push:
-        tags-ignore:
-            - '*'
-        branches:
-            - '*'
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '*'
+
 jobs:
-    full-test:
-        container: cuaesd/aesd-autotest:24-assignment4-buildroot
-        runs-on: self-hosted
-        timeout-minutes: 180
-        steps:
-          - uses: actions/checkout@v2
-          
-          - name: Checkout submodules
-            run: git submodule update --init --recursive
-          
-          - uses: webfactory/ssh-agent@v0.5.3
-            with:
-                ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
-          - name: Set up build environment and run test
-            env:
-              GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-            run: |
-              cd buildroot
-              export srctree=$(pwd)/../base_external
-              make distclean
-              make BR2_EXTERNAL=../base_external aesd_qemu_defconfig
-              make
-          
-          - name: Cleanup
-            if: always()
-            run: ssh-add -D
+  full-test:
+    container: cuaesd/aesd-autotest:24-assignment4-buildroot
+    runs-on: self-hosted
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+
+      - uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Set up build environment and run test
+        env:
+          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+        run: |
+          cd buildroot
+          export srctree=$(pwd)/../base_external
+          make distclean
+          make BR2_EXTERNAL=../base_external aesd_qemu_defconfig
+          make
+
+      - name: Cleanup
+        if: always()
+        run: ssh-add -D
