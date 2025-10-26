@@ -1,21 +1,25 @@
-AESD_ASSIGNMENTS_VERSION = main
-AESD_ASSIGNMENTS_SITE = git@github.com:cu-ecen-aeld/assignments-3-and-later-SanthoshKumar-BE.git
-AESD_ASSIGNMENTS_SITE_METHOD = git
-AESD_ASSIGNMENTS_GIT_SUBMODULES = YES
+################################################################################
+#
+# aesd-assignments-main
+#
+################################################################################
 
-define AESD_ASSIGNMENTS_BUILD_CMDS
-	$(MAKE) -C $(@D)/finder-app CC="$(TARGET_CC)" CFLAGS="$(TARGET_CFLAGS)"
-endef
+# 1. Set the source version (can be arbitrary)
+AESD_ASSIGNMENTS_MAIN_VERSION = 1.0.0
 
-define AESD_ASSIGNMENTS_INSTALL_TARGET_CMDS
-	$(INSTALL) -d 0755 $(TARGET_DIR)/etc/finder-app/conf/
-	$(INSTALL) -m 0644 $(@D)/conf/* $(TARGET_DIR)/etc/finder-app/conf/ || true
+# 2. Set the source location to the directory above 'buildroot' (i.e., the repo root)
+# $(TOPDIR)/.. is the path to the root of the GitHub repository checkout
+AESD_ASSIGNMENTS_MAIN_SITE = $(TOPDIR)/..
 
-	$(INSTALL) -m 0755 $(@D)/finder-app/writer $(TARGET_DIR)/bin/ || true
-	$(INSTALL) -m 0755 $(@D)/finder-app/finder.sh $(TARGET_DIR)/bin/ || true
-	$(INSTALL) -m 0755 $(@D)/finder-app/finder-test.sh $(TARGET_DIR)/bin/ || true
+# 3. CRITICAL: Tell Buildroot to use the 'local' method (i.e., copy the source, do not download)
+AESD_ASSIGNMENTS_MAIN_SITE_METHOD = local
 
-	$(INSTALL) -m 0755 $(@D)/assignment-autotest/test/assignment4/* $(TARGET_DIR)/bin/ || true
-endef
+# 4. Set the source code directory (e.g., if code is in a 'project' subdirectory)
+# If the source is at the repo root, you can omit this or use:
+AESD_ASSIGNMENTS_MAIN_SUBDIR = .
 
+# Optional: Disable hash check since it's a local copy
+AESD_ASSIGNMENTS_MAIN_SKIP_LICENSE_CHECK = YES
+
+# Include the standard Buildroot package boilerplate
 $(eval $(generic-package))
