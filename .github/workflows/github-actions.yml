@@ -10,9 +10,6 @@ jobs:
         container: cuaesd/aesd-autotest:24-assignment4-buildroot
         runs-on: self-hosted
         timeout-minutes: 120
-        env:
-          srctree: ${{ github.workspace }}/base_external
-          BR2_EXTERNAL: ${{ github.workspace }}/base_external
         steps:
           - uses: actions/checkout@v2
           
@@ -23,16 +20,13 @@ jobs:
             with:
                 ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           
-          - name: Set Buildroot environment
-            run: |
-              echo "Setting up Buildroot environment variables"
-              echo "srctree=${{ github.workspace }}/base_external" >> $GITHUB_ENV
-              echo "BR2_EXTERNAL=${{ github.workspace }}/base_external" >> $GITHUB_ENV
-          
-          - name: Run full test
+          - name: Set environment and run test
             env:
               GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-            run: ./full-test.sh
+            run: |
+              export srctree=$(pwd)/base_external
+              export BR2_EXTERNAL=$(pwd)/base_external
+              ./full-test.sh
           
           - name: Cleanup
             if: always()
