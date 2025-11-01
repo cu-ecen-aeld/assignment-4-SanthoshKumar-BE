@@ -5,9 +5,11 @@
 ##############################################################
 
 AESD_ASSIGNMENTS_VERSION = main
-AESD_ASSIGNMENTS_SITE = git@github.com:cu-ecen-aeld/assignments-3-and-later-SanthoshKumar-BE.git
+AESD_ASSIGNMENTS_SITE = https://github.com/SanthoshKumar-BE/aesd-assignments.git
 AESD_ASSIGNMENTS_SITE_METHOD = git
 AESD_ASSIGNMENTS_GIT_SUBMODULES = YES
+AESD_ASSIGNMENTS_LICENSE = MIT
+AESD_ASSIGNMENTS_LICENSE_FILES = LICENSE
 
 define AESD_ASSIGNMENTS_BUILD_CMDS
 	$(MAKE) -C $(@D)/finder-app CC="$(TARGET_CC)" CFLAGS="$(TARGET_CFLAGS)"
