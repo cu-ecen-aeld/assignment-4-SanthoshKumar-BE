@@ -23,6 +23,7 @@ jobs:
 
       - name: Set up build environment and run test
         env:
+        FORCE_UNSAFE_CONFIGURE=1
           GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
         run: |
           cd buildroot
