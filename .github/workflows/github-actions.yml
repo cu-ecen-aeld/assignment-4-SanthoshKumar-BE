@@ -1,48 +1,27 @@
 name: assignment-test
-
 on:
-  push:
-    branches:
-      - '*'
-    tags-ignore:
-      - '*'
-
+    push:
+        tags-ignore:
+            - '*'
+        branches:
+            - '*'
 jobs:
-  full-test:
-    name: Buildroot Full Test
-    runs-on: ${{ github.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
-    container: cuaesd/aesd-autotest:24-assignment4-buildroot
-    timeout-minutes: 180
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Checkout submodules
-        run: git submodule update --init --recursive
-
-      - name: Configure low-memory build
-        run: |
-          echo "Applying low-memory build configuration"
-          export MAKEFLAGS="-j2"
-          export BR2_JLEVEL=2
-
-      - name: Run full test
-        env:
-          GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
-          FORCE_UNSAFE_CONFIGURE: 1   # ✅ Fix for root-in-container configure issue
-          TZ: "Asia/Kolkata"
-        run: |
-          cd buildroot
-          make distclean
-          make BR2_EXTERNAL=../base_external aesd_qemu_defconfig
-          make
-          cd ..
-          ./full-test.sh
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up temporary files..."
-          rm -rf buildroot/output || true
-          echo "Cleanup complete."
+    full-test:
+        container: cuaesd/aesd-autotest:24-assignment4-buildroot
+        runs-on: self-hosted
+        timeout-minutes: 120
+        steps:
+          - uses: actions/checkout@v2
+          - name: Checkout submodules
+            run: git submodule update --init --recursive
+          - uses: webfactory/ssh-agent@v0.5.3
+            with:
+                ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          - name: Run full test
+            env:
+              GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+            run: ./full-test.sh
+          - name: Cleanup
+            if: always()
+            run: |
+              ssh-add -D

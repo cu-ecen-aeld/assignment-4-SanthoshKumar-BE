@@ -1,47 +1,33 @@
+
 ##############################################################
 #
-# AESD-ASSIGNMENTS Buildroot package
+# AESD-ASSIGNMENTS
 #
 ##############################################################
 
-AESD_ASSIGNMENTS_VERSION = main
-AESD_ASSIGNMENTS_SITE = https://github.com/SanthoshKumar-BE/aesd-assignments.git
+#TODO: Fill up the contents below in order to reference your assignment 3 git contents
+# Note: Be sure to reference the *ssh* repository URL here (not https) to work properly
+# with ssh keys and the automated build/test system.
+# Your site should start with git@github.com:
+
+AESD_ASSIGNMENTS_SITE = git@github.com:cu-ecen-aeld/assignments-3-and-later-SanthoshKumar-BE.git
 AESD_ASSIGNMENTS_SITE_METHOD = git
 AESD_ASSIGNMENTS_GIT_SUBMODULES = YES
-AESD_ASSIGNMENTS_LICENSE = MIT
-AESD_ASSIGNMENTS_LICENSE_FILES = LICENSE
+AESD_ASSIGNMENTS_VERSION = 0dbfea94e779e79cf086b8dfbb95d8af90ef83fb 
+
 
 define AESD_ASSIGNMENTS_BUILD_CMDS
-	$(MAKE) -C $(@D)/finder-app CC="$(TARGET_CC)" CFLAGS="$(TARGET_CFLAGS)"
+	$(MAKE) $(TARGET_CONFIGURE_OPTS) -C $(@D)/finder-app all
 endef
 
-# Install scripts and configuration files
 define AESD_ASSIGNMENTS_INSTALL_TARGET_CMDS
-	# Create necessary directories
-	$(INSTALL) -d 0755 $(TARGET_DIR)/etc/finder-app/
+	$(INSTALL) -d 0755 $(@D)/conf/ $(TARGET_DIR)/etc/finder-app/conf/
+	$(INSTALL) -m 0755 $(@D)/conf/* $(TARGET_DIR)/etc/finder-app/conf/
+	$(INSTALL) -m 0755 $(@D)/assignment-autotest/test/assignment4/* $(TARGET_DIR)/bin
 
-	# Install configuration files
-	if [ -f "$(@D)/conf/username.txt" ]; then \
-		$(INSTALL) -m 0644 $(@D)/conf/username.txt $(TARGET_DIR)/etc/finder-app/; \
-	else \
-		echo "testuser" > $(TARGET_DIR)/etc/finder-app/username.txt; \
-	fi
-
-	if [ -f "$(@D)/conf/assignment.txt" ]; then \
-		$(INSTALL) -m 0644 $(@D)/conf/assignment.txt $(TARGET_DIR)/etc/finder-app/; \
-	else \
-		echo "assignment4" > $(TARGET_DIR)/etc/finder-app/assignment.txt; \
-	fi
-
-	# Install binaries and scripts to /usr/bin
-	$(INSTALL) -m 0755 $(@D)/finder-app/writer $(TARGET_DIR)/usr/bin/
-	$(INSTALL) -m 0755 $(@D)/finder-app/finder.sh $(TARGET_DIR)/usr/bin/
-	$(INSTALL) -m 0755 $(@D)/finder-app/finder-test.sh $(TARGET_DIR)/usr/bin/
-
-	# Install test scripts from autotest (optional)
-	if [ -d "$(@D)/assignment-autotest/test/assignment4" ]; then \
-		$(INSTALL) -m 0755 $(@D)/assignment-autotest/test/assignment4/* $(TARGET_DIR)/usr/bin/; \
-	fi
+	$(INSTALL) -m 0755 $(@D)/finder-app/writer $(TARGET_DIR)/usr/bin
+	$(INSTALL) -m 0755 $(@D)/finder-app/finder.sh $(TARGET_DIR)/usr/bin
+	$(INSTALL) -m 0755 $(@D)/finder-app/finder-test.sh $(TARGET_DIR)/usr/bin
 endef
 
 $(eval $(generic-package))
