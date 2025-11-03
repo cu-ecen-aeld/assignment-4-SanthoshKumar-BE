@@ -1,17 +1,10 @@
-name: assignment-test
-on:
-    push:
-        tags-ignore:
-            - '*'
-        branches:
-            - '*'
 jobs:
     full-test:
         container: cuaesd/aesd-autotest:24-assignment4-buildroot
         runs-on: self-hosted
         timeout-minutes: 120
         env:
-        FORCE_UNSAFE_CONFIGURE:1
+          FORCE_UNSAFE_CONFIGURE: 1       # 👈 Global environment
         steps:
           - uses: actions/checkout@v2
           - name: Checkout submodules
@@ -27,3 +20,4 @@ jobs:
             if: always()
             run: |
               ssh-add -D
+
