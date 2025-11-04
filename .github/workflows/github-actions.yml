@@ -11,7 +11,7 @@ jobs:
   full-test:
     container: cuaesd/aesd-autotest:24-assignment4-buildroot
     runs-on: self-hosted
-    timeout-minutes: 120
+    timeout-minutes: 200
     env:
       FORCE_UNSAFE_CONFIGURE: 1   # ✅ Fix Buildroot configure-as-root error
 
