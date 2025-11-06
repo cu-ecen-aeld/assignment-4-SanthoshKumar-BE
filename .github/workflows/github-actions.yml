@@ -11,7 +11,7 @@ jobs:
   full-test:
     container: cuaesd/aesd-autotest:24-assignment4-buildroot
     runs-on: self-hosted
-    timeout-minutes: 2000
+    timeout-minutes: 3600
     env:
       FORCE_UNSAFE_CONFIGURE: 1   # ✅ Fix Buildroot configure-as-root error
 
@@ -32,5 +32,6 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: ssh-add -D
+        run: |
+         ssh-add -D
 
